@@ -1,0 +1,73 @@
+library(Seurat)
+library(SeuratObject)
+library(ggplot2)
+library(scCustomize)
+library(Rcpp)
+library(Matrix)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(BiocManager)
+library(ggrepel)
+library(EnhancedVolcano)
+library(devtools)
+
+
+#Saving the Seurat objects as Rds
+#Cortex and Meninges from entire tissue object
+
+#Plotting the feature_plots
+
+options(repr.plot.width=11, repr.plot.height=11)
+FeaturePlot_scCustom(Cortex_subset_integrated, features = c("FOLR2"),
+                     colors_use = viridis_plasma_dark_high, na_color = "grey", reduction = "umap.harmony", alpha_exp = 0.60, pt.size = 0.2)
+
+
+options(repr.plot.width=12.5, repr.plot.height=13.0)
+DimPlot(Cortex_subset_integrated, group.by = 'seurat_clusters', reduction = "umap.harmony", pt.size = 0, repel = TRUE, label = TRUE, label.size = 5)  + xlim(-15,20) + ylim(-25,15) + ggtitle("Fetal_cortexBulk_subset_clusters") +
+  theme(legend.position = "bottom",
+        plot.title = element_text(color="Blue", size=20, face="bold.italic"),
+        axis.title.x = element_text(color="blue", size=16, face="italic"),
+        axis.title.y = element_text(color="blue", size=16, face="italic"))
+
+#####DEG analysis
+#setting the identify of the clusters
+Idents(Cortex_subset_integrated) <- "seurat_clusters" 
+#findin dem DEGs
+Cortex_subset_integrated.markers <- FindAllMarkers(Cortex_subset_integrated)
+
+#combine the p_val_adj and avg_log2FC
+Cortex_subset_integrated.markers <- Cortex_subset_integrated.markers %>%
+  mutate(combined_score = avg_log2FC * -log10(p_val_adj))
+# Extract the top overexpressed markers for each cluster based on the combined score
+top_markers_each_cluster <- Cortex_subset_integrated.markers %>%
+  # Add row names as a data frame column
+  mutate(gene_name = rownames(.)) %>%
+  group_by(cluster) %>%
+  # Select top 10 based on combined_score
+  top_n(n = 10, wt = combined_score) %>%
+  # Select necessary columns
+  select(gene_name, everything())
+
+
+#Always wanted to go to iceland 
+EnhancedVolcano(Cortex_subset_integrated.markers , 
+                lab = rownames(Cortex_subset_integrated.markers)
+                x ="avg_log2FC", 
+                y ="p_val_adj",
+                
+)
+
+
+
+####attempting to find markers between all other clusters and the big Mac/Mg cluster####
+
+test_markers <- FindMarkers(cortex_subset_integrated,
+                            ident.1 = cluster_group1,
+                            ident.2 = cluster_group2,)
+
+EnhancedVolcano(test_markers, 
+                lab = rownames(test_markers),
+                x = "avg_log2FC", 
+                y = "p_val_adj",
+                selectLab = c('FOLR2'))
